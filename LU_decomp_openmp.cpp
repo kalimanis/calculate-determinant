@@ -1,90 +1,83 @@
-
 #include <iostream>
-#include <omp.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <time.h>
+#include <random>
 #include <boost/chrono.hpp>
-using namespace std;
+#include <omp.h>
 
-void dis(int n, double **upper, double **lower, double **A){
+void dis(int n, double** upper, double** lower, double** A) {
+    int i, j, k, m1, m2;
+#pragma omp parallel for shared(A, lower, upper, n) private(i, j, k, m1, m2)
+    for (i = 0; i < n; i++) {
+        for (k = i; k < n; k++) {
+            m1 = 0;
+            for (j = 0; j < i; j++) {
+                m1 += (lower[i][j] * upper[j][k]);
+            }
+            upper[i][k] = A[i][k] - m1;
+        }
 
-	int i,j,k,m1,m2;
-	for(i=0;i<n;i++){
-		//upper
-		#pragma omp parallel for shared(A,lower,upper,n,i) private(k,m1)
-		for(k=i;k<n;k++){
-			m1=0;
-			for(j=0;j<i;j++){
-				m1+=(lower[i][j]*upper[j][k]);
-			}
-			upper[i][k]=A[i][k]-m1;
-		}
-		//lower
-		#pragma omp parallel for shared(A,lower,upper,n,i) private(k,m2)
-		for(k=i;k<n;k++){
-			if(i==k)
-				lower[i][i]=1;
-			else{
-				m2=0;
-				for(j=0;j<i;j++){
-					m2+=(lower[k][j]*upper[j][i]);
-				}
-				lower[k][i]=(A[k][i]-m2)/upper[i][i];
-			}
-		}
-	}
+#pragma omp parallel for shared(A, lower, upper, n) private(j, k, m2)
+        for (k = i; k < n; k++) {
+            if (i == k)
+                lower[i][i] = 1;
+            else {
+                m2 = 0;
+                for (j = 0; j < i; j++) {
+                    m2 += (lower[k][j] * upper[j][i]);
+                }
+                lower[k][i] = (A[k][i] - m2) / upper[i][i];
+            }
+        }
+    }
 }
 
-double calc(int n, double **a){
-	int i,j;
-	double p=1;
-	for(i=0;i<n;i++){
-		for(j=0;j<n;j++){
-			if(i==j)
-				p=p*a[i][j];
-		}
-	}
-	return p;
+double calc(int n, double** a) {
+    double p = 1;
+    for (int i = 0; i < n; i++) {
+        p *= a[i][i];
+    }
+    return p;
 }
 
-int main(){
-	boost::chrono::system_clock::time_point before = boost::chrono::system_clock::now();
-	//orimos metablhtwn
-	for(int n=1000;n<=100000;n=n*10){
+int main() {
+    boost::chrono::system_clock::time_point before = boost::chrono::system_clock::now();
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_real_distribution<> dis(-1.0, 1.0);
 
-	int i,j,k,m1,m2;
-	double **A;
-	double **lower;
-	double **upper;
-	A=new double*[n];
-	upper=new double*[n];
-	lower=new double*[n];
-	for (i=0;i<n;i++){
-	        A[i]=new double[n];
-		lower[i]=new double[n];
-		upper[i]=new double[n];
-	}
+    for (int n = 1000; n <= 100000; n *= 10) {
+        double** A = new double* [n];
+        double** lower = new double* [n];
+        double** upper = new double* [n];
+        for (int i = 0; i < n; i++) {
+            A[i] = new double[n];
+            lower[i] = new double[n];
+            upper[i] = new double[n];
+        }
 
-	
-	//o pinakas a 8a exei times sto diasthma [-1,1]
-	for(i=0;i<n;i++){
-		for(j=0;j<n;j++){
-			A[i][j]=rand()%3-1;
-		}
-	}
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < n; j++) {
+                A[i][j] = dis(gen);
+            }
+        }
 
-	dis(n,upper,lower,A);
-	
-	cout<<"h orizousa tou pinaka diastashs "<<n<<"x"<<n<<" A einai: "<<endl;
+        dis(n, upper, lower, A);
 
-	cout<<calc(n,upper)<<endl;
-	boost::chrono::system_clock::time_point now = boost::chrono::system_clock::now();
-	boost::chrono::nanoseconds t = boost::chrono::duration_cast<boost::chrono::nanoseconds>(now-before);
-	cout << "took: " << t.count() << " nanoseconds"<<endl;
-	cout<<"=============================="<<endl;
-	cout<<""<<endl;
+        std::cout << "The determinant of the matrix of size " << n << "x" << n << " A is: " << std::endl;
+        std::cout << calc(n, upper) << std::endl;
+        boost::chrono::system_clock::time_point now = boost::chrono::system_clock::now();
+        boost::chrono::nanoseconds t = boost::chrono::duration_cast<boost::chrono::nanoseconds>(now - before);
+        std::cout << "took: " << t.count() << " nanoseconds" << std::endl;
+        std::cout << "==============================" << std::endl;
+        std::cout << "" << std::endl;
 
-	}
-	return 0;
+        for (int i = 0; i < n; i++) {
+            delete[] A[i];
+            delete[] lower[i];
+            delete[] upper[i];
+        }
+        delete[] A;
+        delete[] lower;
+        delete[] upper;
+    }
+    return 0;
 }
