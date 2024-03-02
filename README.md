@@ -1,4 +1,3 @@
-::: container
 # 🧮 Matrix Factorization and Determinant Calculation
 
 This C++ project implements matrix factorization using LU decomposition,
